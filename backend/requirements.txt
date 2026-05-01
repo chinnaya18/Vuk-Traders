@@ -1,0 +1,12 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+sqlalchemy==2.0.35
+psycopg[binary]==3.3.3
+pydantic[email]==2.9.0
+pydantic-settings==2.5.0
+alembic==1.13.0
+reportlab==4.2.0
+qrcode[pil]==7.4
+num2words==0.5.13
+python-dotenv==1.0.1
+python-multipart==0.0.9

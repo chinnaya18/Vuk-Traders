@@ -98,14 +98,10 @@ def create_invoice(db: Session, invoice_data: InvoiceCreate) -> Invoice:
     grand_total = subtotal + total_cgst + total_sgst
     words = amount_to_words(grand_total)
 
-    # Generate QR code
-    qr_data = {
-        "invoice_no": invoice_no,
-        "date": str(invoice_data.invoice_date),
-        "total": str(grand_total),
-        "buyer_id": invoice_data.buyer_id,
-    }
-    qr_code = generate_qr_code(qr_data)
+    # Generate QR code only if IRN is provided
+    qr_code = ""
+    if invoice_data.irn:
+        qr_code = generate_qr_code(invoice_data.irn)
 
     # Create invoice
     invoice = Invoice(

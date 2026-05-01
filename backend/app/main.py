@@ -2,10 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import engine, Base
-from app.routes import owner, buyers, invoices, bank_details
+from app.routes import owner, buyers, invoices, bank_details, products
 
 # Import all models to ensure they are registered with Base
-from app.models import Owner, Buyer, Invoice, InvoiceItem, BankDetails  # noqa: F401
+from app.models import Owner, Buyer, Invoice, InvoiceItem, BankDetails, Product  # noqa: F401
 
 settings = get_settings()
 
@@ -32,6 +32,7 @@ app.include_router(owner.router)
 app.include_router(buyers.router)
 app.include_router(invoices.router)
 app.include_router(bank_details.router)
+app.include_router(products.router)
 
 
 @app.get("/")

@@ -83,7 +83,7 @@ export default function InvoicesPage() {
                   <td className="p-4 font-semibold text-emerald-400">₹{parseFloat(inv.grand_total).toFixed(2)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => handleDownload(inv.id)} className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-slate-700 rounded-md transition-colors" title="Download PDF">
+                      <button onClick={() => handleDownload(inv.id)} className="p-2 text-amber-400 hover:text-amber-300 hover:bg-slate-700 rounded-md transition-colors" title="Download PDF">
                         <Download className="w-4 h-4" />
                       </button>
                       <Link to={`/invoices/${inv.id}`} className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="View">

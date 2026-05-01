@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import client from '../api/client';
 import { Plus, Trash2, Save } from 'lucide-react';
+import { getHSNSACSummary } from '../utils/numberToWords';
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [buyers, setBuyers] = useState([]);
+  const [products, setProducts] = useState([]);
   
   const [invoice, setInvoice] = useState({
     invoice_no: '',
@@ -20,7 +22,10 @@ export default function CreateInvoicePage() {
     destination: '',
     mode_terms_payment: '',
     delivery_note_date: '',
-    terms_of_delivery: ''
+    terms_of_delivery: '',
+    irn: '',
+    ack_no: '',
+    ack_date: ''
   });
 
   const [items, setItems] = useState([
@@ -30,11 +35,13 @@ export default function CreateInvoicePage() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [buyersRes, nextNoRes] = await Promise.all([
+        const [buyersRes, nextNoRes, productsRes] = await Promise.all([
           client.get('/buyers'),
-          client.get('/invoices/next-number')
+          client.get('/invoices/next-number'),
+          client.get('/products').catch(() => ({ data: [] }))
         ]);
         setBuyers(buyersRes.data);
+        setProducts(productsRes.data);
         setInvoice(prev => ({ ...prev, invoice_no: nextNoRes.data.next_invoice_no }));
       } catch (err) {
         toast.error('Failed to load initial data');
@@ -49,6 +56,20 @@ export default function CreateInvoicePage() {
     const newItems = [...items];
     newItems[index][field] = value;
     setItems(newItems);
+  };
+
+  const handleProductSelect = (index, productId) => {
+    const selected = products.find(p => p.id === parseInt(productId));
+    if (selected) {
+      const newItems = [...items];
+      newItems[index] = {
+        ...newItems[index],
+        description: selected.name,
+        hsn_sac: selected.hsn_sac,
+        rate: selected.rate
+      };
+      setItems(newItems);
+    }
   };
 
   const addItem = () => {
@@ -171,6 +192,26 @@ export default function CreateInvoicePage() {
               <label className="block text-sm text-slate-400 mb-1">Destination</label>
               <input type="text" name="destination" value={invoice.destination} onChange={handleInvoiceChange} className="input-field" />
             </div>
+            
+            {/* IRN & Acknowledgment Section */}
+            <div className="col-span-3 border-t border-slate-700 pt-4 mt-2">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">GST Registration Portal Details (Optional)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">IRN (Invoice Registration Number)</label>
+                  <input type="text" name="irn" value={invoice.irn} onChange={handleInvoiceChange} className="input-field text-sm" placeholder="From e-Invoice portal" />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Acknowledgment Number</label>
+                  <input type="text" name="ack_no" value={invoice.ack_no} onChange={handleInvoiceChange} className="input-field text-sm" placeholder="Ack number" />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Acknowledgment Date</label>
+                  <input type="date" name="ack_date" value={invoice.ack_date} onChange={handleInvoiceChange} className="input-field text-sm" />
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">Leave blank if invoice hasn't been registered with GST portal yet</p>
+            </div>
           </div>
         </div>
 
@@ -182,10 +223,11 @@ export default function CreateInvoicePage() {
             </button>
           </div>
           
-          <table className="w-full text-left border-collapse min-w-[800px]">
+          <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
               <tr className="bg-slate-800 border-b border-slate-700">
                 <th className="p-3 text-slate-300 font-medium w-12">#</th>
+                <th className="p-3 text-slate-300 font-medium w-32">Select Product</th>
                 <th className="p-3 text-slate-300 font-medium">Description *</th>
                 <th className="p-3 text-slate-300 font-medium w-24">HSN</th>
                 <th className="p-3 text-slate-300 font-medium w-24">Qty *</th>
@@ -201,6 +243,18 @@ export default function CreateInvoicePage() {
               {items.map((item, index) => (
                 <tr key={index} className="border-b border-slate-700/50">
                   <td className="p-3 text-slate-400">{index + 1}</td>
+                  <td className="p-2">
+                    <select 
+                      value="" 
+                      onChange={(e) => handleProductSelect(index, e.target.value)} 
+                      className="input-field py-1 text-sm"
+                    >
+                      <option value="">Choose...</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} (₹{p.rate})</option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="p-2"><input required type="text" value={item.description} onChange={(e) => handleItemChange(index, 'description', e.target.value)} className="input-field py-1" /></td>
                   <td className="p-2"><input type="text" value={item.hsn_sac} onChange={(e) => handleItemChange(index, 'hsn_sac', e.target.value)} className="input-field py-1" /></td>
                   <td className="p-2"><input required type="number" min="0.01" step="0.01" value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} className="input-field py-1" /></td>
@@ -218,6 +272,14 @@ export default function CreateInvoicePage() {
               ))}
             </tbody>
           </table>
+
+          {/* HSN/SAC Summary */}
+          <div className="mt-4 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-300 font-medium">HSN/SAC Summary:</span>
+              <span className="text-amber-400 font-bold">{getHSNSACSummary(items)}</span>
+            </div>
+          </div>
         </div>
 
         <div className="glass-card p-6 rounded-xl mb-6 flex justify-end">

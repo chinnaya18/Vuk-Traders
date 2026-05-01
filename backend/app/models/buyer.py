@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, JSON
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -16,5 +16,6 @@ class Buyer(Base):
     state = Column(String(100), default="")
     state_code = Column(String(2), default="")
     gstin = Column(String(15), default="")
+    gstins = Column(JSON, default=[])  # Multiple GSTINs
     email = Column(String(255), default="")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

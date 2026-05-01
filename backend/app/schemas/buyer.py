@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from app.utils.validators import validate_gstin, validate_pincode
 
 
@@ -14,6 +14,7 @@ class BuyerBase(BaseModel):
     state: str = ""
     state_code: str = ""
     gstin: str = ""
+    gstins: List[str] = []  # Multiple GSTINs
     email: str = ""
 
     @field_validator("gstin")
@@ -22,6 +23,14 @@ class BuyerBase(BaseModel):
         if v and not validate_gstin(v):
             raise ValueError("Invalid GSTIN format. Expected: 22AAAAA0000A1Z5")
         return v.upper() if v else v
+
+    @field_validator("gstins")
+    @classmethod
+    def validate_gstins_format(cls, v):
+        for gstin in v:
+            if gstin and not validate_gstin(gstin):
+                raise ValueError(f"Invalid GSTIN format: {gstin}. Expected: 22AAAAA0000A1Z5")
+        return [gstin.upper() if gstin else gstin for gstin in v]
 
     @field_validator("pincode")
     @classmethod

@@ -1,7 +1,40 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../api/client';
-import { FileText, Users, TrendingUp, PlusCircle } from 'lucide-react';
+import { FileText, Users, TrendingUp, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+
+  const CAROUSEL_IMAGES = [
+  {
+    title: "Professional Invoicing",
+    description: "Create and manage professional GST invoices",
+    color: "from-amber-600 to-amber-900",
+    icon: "📋"
+  },
+  {
+    title: "Tax Compliance",
+    description: "Automated GST tax calculation and reporting",
+    color: "from-emerald-600 to-emerald-900",
+    icon: "✓"
+  },
+  {
+    title: "Business Growth",
+    description: "Track revenue and manage your clients",
+    color: "from-blue-600 to-blue-900",
+    icon: "📈"
+  },
+  {
+    title: "Client Management",
+    description: "Organize and manage all your buyers",
+    color: "from-purple-600 to-purple-900",
+    icon: "👥"
+  },
+  {
+    title: "PDF Generation",
+    description: "Generate and download professional PDFs",
+    color: "from-orange-600 to-orange-900",
+    icon: "🖨️"
+  }
+];
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -11,6 +44,7 @@ export default function Dashboard() {
     recentInvoices: []
   });
   const [loading, setLoading] = useState(true);
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -41,7 +75,25 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
+  // Auto-rotate carousel every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + CAROUSEL_IMAGES.length) % CAROUSEL_IMAGES.length);
+  };
+
   if (loading) return <div className="text-center p-12">Loading...</div>;
+
+  const currentImage = CAROUSEL_IMAGES[currentSlide];
 
   return (
     <div className="space-y-6">
@@ -52,11 +104,63 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {/* Enhanced Image Carousel */}
+      <div className="relative overflow-hidden rounded-xl">
+        <div className={`bg-gradient-to-br ${currentImage.color} p-12 md:p-16 text-white transition-all duration-500 ease-in-out`}>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex-1">
+              <div className="text-6xl mb-4">{currentImage.icon}</div>
+              <h2 className="text-3xl md:text-4xl font-bold mb-3">{currentImage.title}</h2>
+              <p className="text-lg text-white/90 mb-6">{currentImage.description}</p>
+              <Link to="/invoices/new" className="inline-block bg-white text-slate-900 hover:bg-slate-50 font-semibold py-3 px-6 rounded-lg transition-colors">
+                Get Started →
+              </Link>
+            </div>
+            <div className="text-8xl opacity-20 flex-shrink-0">
+              {currentImage.icon}
+            </div>
+          </div>
+        </div>
+
+        {/* Carousel Controls */}
+        <button 
+          onClick={prevSlide}
+          className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors z-10"
+          aria-label="Previous slide"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <button 
+          onClick={nextSlide}
+          className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors z-10"
+          aria-label="Next slide"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+
+        {/* Slide Indicators */}
+        <div className="flex justify-center gap-2 p-4">
+          {CAROUSEL_IMAGES.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`h-2 rounded-full transition-all ${
+                index === currentSlide 
+                  ? 'bg-white w-8' 
+                  : 'bg-white/40 w-2 hover:bg-white/60'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card p-6 rounded-xl border-l-4 border-indigo-500">
+        <div className="glass-card p-6 rounded-xl border-l-4 border-amber-500 hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-4">
-            <div className="bg-indigo-500/20 p-3 rounded-lg">
-              <FileText className="w-8 h-8 text-indigo-400" />
+            <div className="bg-amber-500/20 p-3 rounded-lg">
+              <FileText className="w-8 h-8 text-amber-400" />
             </div>
             <div>
               <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Total Invoices</p>
@@ -65,19 +169,19 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <div className="glass-card p-6 rounded-xl border-l-4 border-emerald-500">
+        <div className="glass-card p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-4">
             <div className="bg-emerald-500/20 p-3 rounded-lg">
               <TrendingUp className="w-8 h-8 text-emerald-400" />
             </div>
             <div>
               <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Total Revenue</p>
-              <h2 className="text-3xl font-bold text-white">₹{stats.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</h2>
+              <h2 className="text-3xl font-bold text-white">₹{stats.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h2>
             </div>
           </div>
         </div>
 
-        <div className="glass-card p-6 rounded-xl border-l-4 border-blue-500">
+        <div className="glass-card p-6 rounded-xl border-l-4 border-blue-500 hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-4">
             <div className="bg-blue-500/20 p-3 rounded-lg">
               <Users className="w-8 h-8 text-blue-400" />
@@ -90,11 +194,12 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-        <div className="glass-card p-6 rounded-xl">
+        <div className="glass-card p-6 rounded-xl hover:shadow-lg transition-shadow">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Recent Invoices</h2>
-            <Link to="/invoices" className="text-indigo-400 hover:text-indigo-300 text-sm font-medium">View All</Link>
+            <Link to="/invoices" className="text-amber-400 hover:text-amber-300 text-sm font-medium">View All</Link>
           </div>
           
           {stats.recentInvoices.length === 0 ? (
@@ -102,28 +207,51 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-4">
               {stats.recentInvoices.map(inv => (
-                <div key={inv.id} className="flex justify-between items-center p-4 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                  <div>
-                    <h3 className="font-bold text-white">{inv.invoice_no}</h3>
-                    <p className="text-sm text-slate-400">{inv.buyer?.company_name}</p>
+                <Link key={inv.id} to={`/invoices/${inv.id}`} className="block">
+                  <div className="flex justify-between items-center p-4 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer">
+                    <div>
+                      <h3 className="font-bold text-white">{inv.invoice_no}</h3>
+                      <p className="text-sm text-slate-400">{inv.buyer?.company_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-emerald-400">₹{parseFloat(inv.grand_total).toLocaleString('en-IN')}</p>
+                      <p className="text-xs text-slate-500">{new Date(inv.invoice_date).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-emerald-400">₹{parseFloat(inv.grand_total).toLocaleString('en-IN')}</p>
-                    <p className="text-xs text-slate-500">{new Date(inv.invoice_date).toLocaleDateString()}</p>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
         
-        <div className="glass-card p-6 rounded-xl flex flex-col justify-center items-center text-center">
-          <div className="bg-slate-800 p-6 rounded-full mb-4">
-            <FileText className="w-12 h-12 text-slate-400" />
+        <div className="glass-card p-6 rounded-xl flex flex-col justify-center items-center text-center hover:shadow-lg transition-shadow">
+          <div className="bg-amber-500/20 p-6 rounded-full mb-4">
+            <FileText className="w-12 h-12 text-amber-400" />
           </div>
           <h2 className="text-xl font-bold mb-2">Ready to bill?</h2>
-          <p className="text-slate-400 mb-6 max-w-sm">Create professional GST invoices with automatic tax calculation and PDF generation.</p>
+          <p className="text-slate-400 mb-6 max-w-sm">Create professional GST invoices with automatic tax calculation, QR codes, and PDF generation.</p>
           <Link to="/invoices/new" className="btn-primary">Generate Invoice</Link>
+        </div>
+      </div>
+
+      {/* Quick Stats Section */}
+      <div className="glass-card p-6 rounded-xl">
+        <h3 className="text-lg font-bold mb-4">Quick Summary</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
+            <p className="text-slate-400 mb-1">Average Invoice Value</p>
+            <p className="text-2xl font-bold text-emerald-400">
+              ₹{stats.totalInvoices > 0 ? (stats.totalRevenue / stats.totalInvoices).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '0'}
+            </p>
+          </div>
+          <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
+            <p className="text-slate-400 mb-1">Buyers on File</p>
+            <p className="text-2xl font-bold text-blue-400">{stats.totalBuyers}</p>
+          </div>
+          <div className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
+            <p className="text-slate-400 mb-1">Invoices This Month</p>
+            <p className="text-2xl font-bold text-amber-400">{stats.totalInvoices}</p>
+          </div>
         </div>
       </div>
     </div>

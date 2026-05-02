@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import client from '../api/client';
@@ -9,6 +9,7 @@ export default function InvoiceViewPage() {
   const { id } = useParams();
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const printRef = useRef();
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -39,152 +40,189 @@ export default function InvoiceViewPage() {
     }
   };
 
+  const handlePrint = () => {
+    const printContent = printRef.current;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${invoice.invoice_no}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; list-style: none; }
+          html, body { font-family: Arial, sans-serif; font-size: 10px; color: #000; background: white; }
+          table { border-collapse: collapse; width: 100%; }
+          td, th { border: 1px solid #000; padding: 2px 3px; }
+          th { background: #f0f0f0; font-weight: bold; text-align: center; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 4px; }
+          .title { font-size: 14px; font-weight: bold; }
+          .company { text-align: right; }
+          .row { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+          .box { border: 1px solid #000; padding: 3px; font-size: 9px; }
+          .section-title { font-weight: bold; font-size: 9px; border-bottom: 1px solid #000; margin-bottom: 2px; }
+          @page { margin: 3mm; size: A4; }
+          @media print { body { margin: 0; padding: 2px; } }
+        </style>
+      </head>
+      <body>${printContent.innerHTML}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+  };
+
   if (loading) return <div className="text-center p-12">Loading...</div>;
-  if (!invoice) return <div className="text-center p-12 text-red-400">Invoice not found</div>;
+  if (!invoice) return <div className="text-center p-12">Invoice not found</div>;
+
+  const roundOff = parseFloat(invoice.round_off || 0);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link to="/invoices" className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors">
+          <Link to="/invoices" className="p-2 rounded-full transition-colors" style={{backgroundColor: '#1e293b'}}>
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-3xl font-bold">Invoice {invoice.invoice_no}</h1>
         </div>
         <div className="flex gap-3">
-          <button onClick={handleDownload} className="btn-secondary flex items-center gap-2">
+          <button onClick={handlePrint} className="btn-secondary flex items-center gap-2">
+            <Printer className="w-4 h-4" /> Print Invoice
+          </button>
+          <button onClick={handleDownload} className="btn-primary flex items-center gap-2">
             <Download className="w-4 h-4" /> Download PDF
           </button>
         </div>
       </div>
 
-      <div className="glass-card p-8 rounded-xl bg-slate-900 text-white shadow-xl overflow-x-auto">
-        {/* Invoice Header */}
-        <div className="border-b-2 border-slate-600 pb-6 mb-6 flex justify-between items-start">
-          <div>
-            <h2 className="text-3xl font-bold text-amber-400">TAX INVOICE</h2>
-            <div className="mt-4 text-sm text-slate-300">
-              <p><strong>Invoice No:</strong> <span className="text-white">{invoice.invoice_no}</span></p>
-              <p><strong>Date:</strong> <span className="text-white">{new Date(invoice.invoice_date).toLocaleDateString()}</span></p>
-            </div>
-            {/* GST Portal Details */}
-            {(invoice.irn || invoice.ack_no || invoice.ack_date) && (
-              <div className="mt-4 p-3 bg-emerald-900/30 border border-emerald-600 rounded text-sm">
-                <p className="font-semibold text-emerald-400 mb-2">✅ GST e-Invoice Registered</p>
-                {invoice.irn && <p><strong>IRN:</strong> <span className="font-mono text-emerald-300 break-all">{invoice.irn}</span></p>}
-                {invoice.ack_no && <p><strong>Ack No:</strong> <span className="text-white">{invoice.ack_no}</span></p>}
-                {invoice.ack_date && <p><strong>Ack Date:</strong> <span className="text-white">{new Date(invoice.ack_date).toLocaleDateString()}</span></p>}
-              </div>
-            )}
-          </div>
-          <div className="text-right flex flex-col items-end gap-4">
+      <div className="glass-card rounded-xl text-white shadow-xl overflow-x-auto" style={{backgroundColor: '#0f172a', padding: '4px'}}>
+        <div ref={printRef} style={{backgroundColor: '#fff', color: '#000', padding: '4px', fontSize: '10px', fontFamily: 'Arial'}}>
+          {/* Header */}
+          <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '4px', borderBottom: '1px solid #000', paddingBottom: '4px'}}>
             <div>
-              <h3 className="text-xl font-bold text-white">Vuk Traders</h3>
-              <p className="text-sm text-slate-300 max-w-[250px]">
-                Your Company Address Here, City, State, Pincode
-              </p>
+              <div style={{fontSize: '14px', fontWeight: 'bold'}}>TAX INVOICE</div>
+              <div style={{fontSize: '8px', marginTop: '2px'}}>{invoice.invoice_no} | {invoice.invoice_date}</div>
             </div>
-            {/* QR Code Display - Only if IRN exists */}
-            {invoice.irn && invoice.qr_code_data && (
-              <div className="border border-slate-600 p-2 bg-slate-800 rounded">
-                <img 
-                  src={`data:image/png;base64,${invoice.qr_code_data}`}
-                  alt="Invoice QR Code"
-                  className="w-24 h-24"
-                />
-                <p className="text-xs text-slate-400 text-center mt-1">IRN QR Code</p>
-              </div>
-            )}
+            <div style={{textAlign: 'right', fontSize: '11px', fontWeight: 'bold'}}>VUK TRADERS</div>
           </div>
-        </div>
 
-        {/* Parties Info */}
-        <div className="grid grid-cols-2 gap-8 mb-8 text-sm">
-          <div>
-            <h4 className="font-bold text-amber-400 border-b border-slate-600 pb-1 mb-2">Billed To</h4>
-            <p className="font-bold text-white">{invoice.buyer.company_name}</p>
-            <p className="text-slate-300">{invoice.buyer.address_line1}</p>
-            {(invoice.buyer.address_line2 || invoice.buyer.address_line3) && (
-              <p className="text-slate-300">{invoice.buyer.address_line2} {invoice.buyer.address_line3}</p>
-            )}
-            <p className="text-slate-300">{invoice.buyer.city}, {invoice.buyer.state} - {invoice.buyer.pincode}</p>
-            <p className="text-slate-300 mt-1"><strong>GSTIN:</strong> <span className="text-white">{invoice.buyer.gstin || 'N/A'}</span></p>
-          </div>
-          <div>
-            <h4 className="font-bold text-amber-400 border-b border-slate-600 pb-1 mb-2">Shipping Details</h4>
-            <p className="text-slate-300"><strong>Destination:</strong> <span className="text-white">{invoice.destination || 'N/A'}</span></p>
-            <p className="text-slate-300"><strong>Dispatched Through:</strong> <span className="text-white">{invoice.dispatched_through || 'N/A'}</span></p>
-            <p className="text-slate-300"><strong>Terms of Delivery:</strong> <span className="text-white">{invoice.terms_of_delivery || 'N/A'}</span></p>
-          </div>
-        </div>
-
-        {/* Items Table */}
-        <table className="w-full text-sm mb-8 border border-slate-600">
-          <thead>
-            <tr className="bg-slate-800 text-amber-400 border-b border-slate-600">
-              <th className="p-2 border-r border-slate-600 text-center w-12">S.No</th>
-              <th className="p-2 border-r border-slate-600 text-left">Description of Goods</th>
-              <th className="p-2 border-r border-slate-600 text-center w-24">HSN/SAC</th>
-              <th className="p-2 border-r border-slate-600 text-right w-20">Qty</th>
-              <th className="p-2 border-r border-slate-600 text-right w-24">Rate</th>
-              <th className="p-2 text-right w-32">Amount</th>
+          {/* Invoice Details Table */}
+          <table style={{marginBottom: '4px', fontSize: '9px'}}>
+            <tr>
+              <td style={{width: '25%'}}><strong>SI No.</strong></td>
+              <td style={{width: '30%'}}><strong>Description of Goods</strong></td>
+              <td style={{width: '15%', textAlign: 'center'}}><strong>HSN/SAC</strong></td>
+              <td style={{width: '10%', textAlign: 'center'}}><strong>Qty</strong></td>
+              <td style={{width: '10%', textAlign: 'right'}}><strong>Rate</strong></td>
+              <td style={{width: '10%', textAlign: 'center'}}><strong>CGST @%</strong></td>
+              <td style={{width: '10%', textAlign: 'center'}}><strong>SGST @%</strong></td>
+              <td style={{width: '10%', textAlign: 'right'}}><strong>Amount</strong></td>
             </tr>
-          </thead>
-          <tbody>
             {invoice.items.map((item, index) => (
-              <tr key={item.id} className="border-b border-slate-600 text-slate-300">
-                <td className="p-2 border-r border-slate-600 text-center">{index + 1}</td>
-                <td className="p-2 border-r border-slate-600 text-white">{item.description}</td>
-                <td className="p-2 border-r border-slate-600 text-center text-white">{item.hsn_sac || '-'}</td>
-                <td className="p-2 border-r border-slate-600 text-right text-white">{item.quantity} {item.unit}</td>
-                <td className="p-2 border-r border-slate-600 text-right text-white">{parseFloat(item.rate).toFixed(2)}</td>
-                <td className="p-2 text-right text-white">{parseFloat(item.amount).toFixed(2)}</td>
+              <tr key={item.id} style={{fontSize: '9px'}}>
+                <td style={{textAlign: 'center'}}>{index + 1}</td>
+                <td>{item.description}</td>
+                <td style={{textAlign: 'center'}}>{item.hsn_sac || '-'}</td>
+                <td style={{textAlign: 'center'}}>{item.quantity}</td>
+                <td style={{textAlign: 'right'}}>{parseFloat(item.rate).toFixed(2)}</td>
+                <td style={{textAlign: 'center'}}>9.00%</td>
+                <td style={{textAlign: 'center'}}>9.00%</td>
+                <td style={{textAlign: 'right'}}>{parseFloat(item.amount).toFixed(2)}</td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            <tr style={{fontWeight: 'bold'}}>
+              <td colSpan="5" style={{textAlign: 'right', borderRight: '1px solid #000'}}>Total</td>
+              <td style={{textAlign: 'center'}}>{parseFloat(invoice.total_cgst / (invoice.subtotal || 1) * 100).toFixed(1)}%</td>
+              <td style={{textAlign: 'center'}}>{parseFloat(invoice.total_sgst / (invoice.subtotal || 1) * 100).toFixed(1)}%</td>
+              <td style={{textAlign: 'right'}}>{parseFloat(invoice.subtotal).toFixed(2)}</td>
+            </tr>
+          </table>
 
-        {/* HSN/SAC Summary */}
-        <div className="mb-8 p-3 bg-slate-800 border border-slate-600 rounded">
-          <div className="flex justify-between items-center">
-            <span className="text-slate-300 font-medium">HSN/SAC Summary:</span>
-            <span className="text-amber-400 font-bold">{getHSNSACSummary(invoice.items)}</span>
+          {/* Party Info */}
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', marginBottom: '4px', fontSize: '9px'}}>
+            <div style={{border: '1px solid #000', padding: '3px'}}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px'}}>Buyer Bill to</div>
+              <div style={{fontSize: '8px'}}>{invoice.buyer.company_name}</div>
+              <div style={{fontSize: '8px'}}>{invoice.buyer.address_line1}</div>
+              <div style={{fontSize: '8px'}}>GSTIN: {invoice.buyer.gstin || 'N/A'}</div>
+            </div>
+            <div style={{border: '1px solid #000', padding: '3px'}}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px'}}>Terms of Delivery</div>
+              <div style={{fontSize: '8px'}}>{invoice.destination || 'N/A'}</div>
+              <div style={{fontSize: '8px'}}>Via: {invoice.dispatched_through || 'N/A'}</div>
+            </div>
           </div>
-        </div>
 
-        {/* Totals Section */}
-        <div className="flex justify-end mb-8">
-          <div className="w-1/2">
-            <table className="w-full text-sm">
-              <tbody>
-                <tr>
-                  <td className="p-2 text-right font-semibold text-slate-300">Sub Total</td>
-                  <td className="p-2 text-right w-32 border border-slate-600 text-white">{parseFloat(invoice.subtotal).toFixed(2)}</td>
+          {/* Totals and Amounts */}
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', marginBottom: '4px', fontSize: '9px'}}>
+            <div style={{border: '1px solid #000', padding: '3px'}}>
+              <div><strong>Subtotal (before tax):</strong> {parseFloat(invoice.subtotal).toFixed(2)}</div>
+              <div><strong>CGST Total:</strong> {parseFloat(invoice.total_cgst).toFixed(2)}</div>
+              <div><strong>SGST Total:</strong> {parseFloat(invoice.total_sgst).toFixed(2)}</div>
+              <div><strong>Round Off:</strong> {roundOff >= 0 ? '+' : ''}{roundOff.toFixed(2)}</div>
+              <div style={{fontWeight: 'bold', fontSize: '10px'}}><strong>Grand Total:</strong> {parseFloat(invoice.grand_total).toFixed(2)}</div>
+            </div>
+            <div style={{border: '1px solid #000', padding: '3px'}}>
+              <div style={{fontSize: '8px'}}><strong>Amount (in words):</strong></div>
+              <div style={{fontSize: '9px', fontWeight: 'bold', marginTop: '2px'}}>{invoice.amount_in_words}</div>
+            </div>
+          </div>
+
+          {/* HSN/SAC Summary */}
+          <div style={{marginBottom: '4px', border: '1px solid #000', padding: '3px', fontSize: '8px'}}>
+            <div style={{fontWeight: 'bold', marginBottom: '2px'}}>HSN/SAC Summary</div>
+            <table>
+              <tr>
+                <td><strong>HSN/SAC</strong></td>
+                <td style={{textAlign: 'center'}}><strong>Total Qty</strong></td>
+                <td style={{textAlign: 'right'}}><strong>Taxable Value</strong></td>
+                <td style={{textAlign: 'center'}}><strong>CGST Rate</strong></td>
+                <td style={{textAlign: 'right'}}><strong>CGST Amt</strong></td>
+                <td style={{textAlign: 'center'}}><strong>SGST Rate</strong></td>
+                <td style={{textAlign: 'right'}}><strong>SGST Amt</strong></td>
+                <td style={{textAlign: 'right'}}><strong>Total Tax</strong></td>
+              </tr>
+              {invoice.items.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.hsn_sac || '-'}</td>
+                  <td style={{textAlign: 'center'}}>{item.quantity}</td>
+                  <td style={{textAlign: 'right'}}>{parseFloat(item.amount).toFixed(2)}</td>
+                  <td style={{textAlign: 'center'}}>9.00%</td>
+                  <td style={{textAlign: 'right'}}>{(parseFloat(item.amount) * 0.09).toFixed(2)}</td>
+                  <td style={{textAlign: 'center'}}>9.00%</td>
+                  <td style={{textAlign: 'right'}}>{(parseFloat(item.amount) * 0.09).toFixed(2)}</td>
+                  <td style={{textAlign: 'right'}}>{(parseFloat(item.amount) * 0.18).toFixed(2)}</td>
                 </tr>
-                <tr>
-                  <td className="p-2 text-right font-semibold text-slate-300">CGST</td>
-                  <td className="p-2 text-right w-32 border border-slate-600 text-white">{parseFloat(invoice.total_cgst).toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td className="p-2 text-right font-semibold text-slate-300">SGST</td>
-                  <td className="p-2 text-right w-32 border border-slate-600 text-white">{parseFloat(invoice.total_sgst).toFixed(2)}</td>
-                </tr>
-                <tr className="bg-slate-800 font-bold text-lg">
-                  <td className="p-3 text-right text-amber-400 border border-slate-600">Grand Total (₹)</td>
-                  <td className="p-3 text-right text-amber-400 border border-slate-600">{parseFloat(invoice.grand_total).toFixed(2)}</td>
-                </tr>
-              </tbody>
+              ))}
             </table>
           </div>
-        </div>
-        
-        {/* Amount in words */}
-        <div className="mb-8">
-          <p className="text-sm text-slate-400">Amount Chargeable (in words)</p>
-          <p className="font-bold text-white capitalize">INR {invoice.amount_in_words}</p>
-        </div>
 
+          {/* Bank Details */}
+          <div style={{marginBottom: '4px', border: '1px solid #000', padding: '3px', fontSize: '9px'}}>
+            <div><strong>Company's Bank Details:</strong></div>
+            <div style={{fontSize: '8px', marginTop: '2px'}}>Bank Name: State Bank of India</div>
+            <div style={{fontSize: '8px'}}>A/c No.: 000000123456789</div>
+            <div style={{fontSize: '8px'}}>Branch: Main Branch, Raipur</div>
+            <div style={{fontSize: '8px'}}>IFSC Code: SBIN0000123</div>
+          </div>
+
+          {/* Declaration */}
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '8px'}}>
+            <div style={{border: '1px solid #000', padding: '3px'}}>
+              <div><strong>Declaration:</strong></div>
+              <div style={{marginTop: '2px', lineHeight: '1.3'}}>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</div>
+            </div>
+            <div style={{border: '1px solid #000', padding: '3px', textAlign: 'right'}}>
+              <div style={{marginBottom: '20px'}}>for VUK TRADERS (DUMMY)</div>
+              <div style={{fontSize: '7px', borderTop: '1px solid #000', paddingTop: '2px'}}>Authorised Signatory</div>
+            </div>
+          </div>
+
+          <div style={{textAlign: 'center', fontSize: '7px', marginTop: '2px', color: '#666'}}>This is a computer generated invoice.</div>
+        </div>
       </div>
     </div>
   );
 }
+

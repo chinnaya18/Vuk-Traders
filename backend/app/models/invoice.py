@@ -26,6 +26,7 @@ class Invoice(Base):
     subtotal = Column(Numeric(12, 2), default=0)
     total_cgst = Column(Numeric(12, 2), default=0)
     total_sgst = Column(Numeric(12, 2), default=0)
+    round_off = Column(Numeric(12, 2), default=0)
     grand_total = Column(Numeric(12, 2), default=0)
     amount_in_words = Column(String(500), default="")
 

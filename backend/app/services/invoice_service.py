@@ -95,7 +95,10 @@ def create_invoice(db: Session, invoice_data: InvoiceCreate) -> Invoice:
 
         items.append(InvoiceItem(**item_dict))
 
-    grand_total = subtotal + total_cgst + total_sgst
+    exact_total = subtotal + total_cgst + total_sgst
+    rounded_total = Decimal(str(round(float(exact_total))))
+    round_off = (rounded_total - exact_total).quantize(Decimal("0.01"))
+    grand_total = rounded_total
     words = amount_to_words(grand_total)
 
     # Generate QR code only if IRN is provided
@@ -119,6 +122,7 @@ def create_invoice(db: Session, invoice_data: InvoiceCreate) -> Invoice:
         subtotal=subtotal,
         total_cgst=total_cgst,
         total_sgst=total_sgst,
+        round_off=round_off,
         grand_total=grand_total,
         amount_in_words=words,
         declaration=invoice_data.declaration,

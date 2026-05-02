@@ -141,6 +141,7 @@ def _invoice_to_response(invoice: Invoice) -> InvoiceResponse:
         subtotal=invoice.subtotal,
         total_cgst=invoice.total_cgst,
         total_sgst=invoice.total_sgst,
+        round_off=invoice.round_off,
         grand_total=invoice.grand_total,
         amount_in_words=invoice.amount_in_words,
         declaration=invoice.declaration,

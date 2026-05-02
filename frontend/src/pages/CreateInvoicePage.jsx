@@ -1,15 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import client from '../api/client';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, X, CheckCircle, Eye } from 'lucide-react';
 import { getHSNSACSummary } from '../utils/numberToWords';
+
+const PAYMENT_MODES = [
+  'Cash',
+  'Credit',
+  'Net 15',
+  'Net 30',
+  'Net 45',
+  'Net 60',
+  'Bank Transfer / NEFT',
+  'RTGS',
+  'UPI',
+  'Cheque',
+  'Demand Draft',
+  'Letter of Credit',
+  'Against Delivery',
+  'Advance Payment',
+];
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [buyers, setBuyers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
   
   const [invoice, setInvoice] = useState({
     invoice_no: '',
@@ -42,7 +60,7 @@ export default function CreateInvoicePage() {
         ]);
         setBuyers(buyersRes.data);
         setProducts(productsRes.data);
-        setInvoice(prev => ({ ...prev, invoice_no: nextNoRes.data.next_invoice_no }));
+        setInvoice(prev => ({ ...prev, invoice_no: nextNoRes.data.invoice_no }));
       } catch (err) {
         toast.error('Failed to load initial data');
       }
@@ -94,17 +112,27 @@ export default function CreateInvoicePage() {
       total_sgst += amount * (parseFloat(item.sgst_rate || 0) / 100);
     });
 
+    const exact_total = subtotal + total_cgst + total_sgst;
+    const rounded_total = Math.round(exact_total);
+    const round_off = rounded_total - exact_total;
+
     return {
       subtotal,
       total_cgst,
       total_sgst,
-      grand_total: subtotal + total_cgst + total_sgst
+      round_off,
+      grand_total: rounded_total
     };
   };
 
   const totals = calculateTotals();
 
-  const handleSave = async (e) => {
+  // Get selected buyer name
+  const getSelectedBuyer = () => {
+    return buyers.find(b => b.id === parseInt(invoice.buyer_id));
+  };
+
+  const handlePreview = (e) => {
     e.preventDefault();
     if (!invoice.buyer_id) {
       toast.error('Please select a buyer');
@@ -114,11 +142,17 @@ export default function CreateInvoicePage() {
       toast.error('Please add at least one item');
       return;
     }
+    setShowPreview(true);
+  };
 
+  const handleConfirmSave = async () => {
     setLoading(true);
     try {
       const payload = {
         ...invoice,
+        buyer_id: parseInt(invoice.buyer_id),
+        delivery_note_date: invoice.delivery_note_date || null,
+        ack_date: invoice.ack_date || null,
         items: items.map((item, index) => ({
           serial_no: index + 1,
           description: item.description,
@@ -133,9 +167,18 @@ export default function CreateInvoicePage() {
       
       const res = await client.post('/invoices', payload);
       toast.success('Invoice created successfully!');
+      setShowPreview(false);
       navigate(`/invoices/${res.data.id}`);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to create invoice');
+      let errorMessage = 'Failed to create invoice';
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          errorMessage = err.response.data.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ');
+        } else {
+          errorMessage = err.response.data.detail;
+        }
+      }
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -147,7 +190,7 @@ export default function CreateInvoicePage() {
         <h1 className="text-3xl font-bold">Create New Invoice</h1>
       </div>
 
-      <form onSubmit={handleSave}>
+      <form onSubmit={handlePreview}>
         <div className="glass-card p-6 rounded-xl mb-6">
           <h2 className="text-xl font-semibold mb-4 border-b border-slate-700 pb-2">Invoice Details</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -178,7 +221,12 @@ export default function CreateInvoicePage() {
             </div>
             <div>
               <label className="block text-sm text-slate-400 mb-1">Mode/Terms of Payment</label>
-              <input type="text" name="mode_terms_payment" value={invoice.mode_terms_payment} onChange={handleInvoiceChange} className="input-field" />
+              <select name="mode_terms_payment" value={invoice.mode_terms_payment} onChange={handleInvoiceChange} className="input-field">
+                <option value="">Select payment mode</option>
+                {PAYMENT_MODES.map(mode => (
+                  <option key={mode} value={mode}>{mode}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm text-slate-400 mb-1">Dispatch Document No</label>
@@ -298,6 +346,10 @@ export default function CreateInvoicePage() {
                 <span>Total SGST</span>
                 <span>₹{totals.total_sgst.toFixed(2)}</span>
               </div>
+              <div className="flex justify-between text-slate-300 border-t border-slate-700/50 pt-2">
+                <span>Round Off</span>
+                <span>{totals.round_off >= 0 ? '+' : ''}₹{totals.round_off.toFixed(2)}</span>
+              </div>
               <div className="flex justify-between items-center text-xl font-bold text-emerald-400 pt-3 border-t border-slate-700">
                 <span>Grand Total</span>
                 <span>₹{totals.grand_total.toFixed(2)}</span>
@@ -306,12 +358,146 @@ export default function CreateInvoicePage() {
             
             <div className="mt-8 pt-6 border-t border-slate-700 flex justify-end">
               <button type="submit" disabled={loading} className="btn-primary flex items-center gap-2 w-full justify-center text-lg py-3">
-                <Save className="w-5 h-5" /> Save & Generate Invoice
+                <Eye className="w-5 h-5" /> Preview & Save Invoice
               </button>
             </div>
           </div>
         </div>
       </form>
+
+      {/* ===== CONFIRMATION PREVIEW MODAL ===== */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowPreview(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-700 p-6 flex justify-between items-center z-10 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-600/20 rounded-full flex items-center justify-center">
+                  <Eye className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Invoice Preview</h2>
+                  <p className="text-sm text-slate-400">Review the details before confirming</p>
+                </div>
+              </div>
+              <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Invoice Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-amber-400 mb-3">Invoice Details</h3>
+                  <div className="space-y-1.5 text-sm">
+                    <p><span className="text-slate-400">Invoice No:</span> <span className="text-white font-medium">{invoice.invoice_no}</span></p>
+                    <p><span className="text-slate-400">Date:</span> <span className="text-white">{invoice.invoice_date}</span></p>
+                    <p><span className="text-slate-400">Delivery Note:</span> <span className="text-white">{invoice.delivery_note || '-'}</span></p>
+                    <p><span className="text-slate-400">Mode/Terms:</span> <span className="text-white">{invoice.mode_terms_payment || '-'}</span></p>
+                  </div>
+                </div>
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-amber-400 mb-3">Dispatch Details</h3>
+                  <div className="space-y-1.5 text-sm">
+                    <p><span className="text-slate-400">Buyer Order No:</span> <span className="text-white">{invoice.buyer_order_no || '-'}</span></p>
+                    <p><span className="text-slate-400">Dispatch Doc No:</span> <span className="text-white">{invoice.dispatch_doc_no || '-'}</span></p>
+                    <p><span className="text-slate-400">Dispatched Through:</span> <span className="text-white">{invoice.dispatched_through || '-'}</span></p>
+                    <p><span className="text-slate-400">Destination:</span> <span className="text-white">{invoice.destination || '-'}</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Buyer Info */}
+              {getSelectedBuyer() && (
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-amber-400 mb-2">Buyer</h3>
+                  <p className="text-white font-medium">{getSelectedBuyer().company_name}</p>
+                  <p className="text-sm text-slate-300">{getSelectedBuyer().city}, {getSelectedBuyer().state}</p>
+                  {getSelectedBuyer().gstin && <p className="text-sm text-slate-300">GSTIN: {getSelectedBuyer().gstin}</p>}
+                </div>
+              )}
+
+              {/* Items Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-slate-700 rounded-lg overflow-hidden">
+                  <thead>
+                    <tr className="bg-slate-800 text-amber-400">
+                      <th className="p-2 text-center border-r border-slate-700 w-10">#</th>
+                      <th className="p-2 text-left border-r border-slate-700">Description</th>
+                      <th className="p-2 text-center border-r border-slate-700 w-20">HSN</th>
+                      <th className="p-2 text-right border-r border-slate-700 w-16">Qty</th>
+                      <th className="p-2 text-right border-r border-slate-700 w-20">Rate</th>
+                      <th className="p-2 text-center border-r border-slate-700 w-16">CGST%</th>
+                      <th className="p-2 text-center border-r border-slate-700 w-16">SGST%</th>
+                      <th className="p-2 text-right w-24">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, index) => (
+                      <tr key={index} className="border-t border-slate-700 text-slate-200">
+                        <td className="p-2 text-center border-r border-slate-700">{index + 1}</td>
+                        <td className="p-2 border-r border-slate-700 text-white">{item.description}</td>
+                        <td className="p-2 text-center border-r border-slate-700">{item.hsn_sac || '-'}</td>
+                        <td className="p-2 text-right border-r border-slate-700">{item.quantity} {item.unit}</td>
+                        <td className="p-2 text-right border-r border-slate-700">₹{parseFloat(item.rate || 0).toFixed(2)}</td>
+                        <td className="p-2 text-center border-r border-slate-700">{item.cgst_rate}%</td>
+                        <td className="p-2 text-center border-r border-slate-700">{item.sgst_rate}%</td>
+                        <td className="p-2 text-right text-white font-medium">₹{(parseFloat(item.quantity || 0) * parseFloat(item.rate || 0)).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals */}
+              <div className="flex justify-end">
+                <div className="w-full max-w-xs space-y-2 bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <div className="flex justify-between text-sm text-slate-300">
+                    <span>Subtotal</span>
+                    <span>₹{totals.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-300">
+                    <span>CGST</span>
+                    <span>₹{totals.total_cgst.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-300">
+                    <span>SGST</span>
+                    <span>₹{totals.total_sgst.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-300 border-t border-slate-700/50 pt-2">
+                    <span>Round Off</span>
+                    <span>{totals.round_off >= 0 ? '+' : ''}₹{totals.round_off.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-emerald-400 pt-2 border-t border-slate-700">
+                    <span>Grand Total</span>
+                    <span>₹{totals.grand_total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 bg-slate-900 border-t border-slate-700 p-6 flex justify-end gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setShowPreview(false)}
+                className="btn-secondary flex items-center gap-2 px-6"
+              >
+                <X className="w-4 h-4" /> Go Back & Edit
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                disabled={loading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-6 rounded-md transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 focus:ring-offset-slate-900"
+              >
+                <CheckCircle className="w-5 h-5" />
+                {loading ? 'Saving...' : 'Confirm & Save Invoice'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,17 @@ import { Link } from 'react-router-dom';
 import client from '../api/client';
 import { FileText, Users, TrendingUp, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
-  const CAROUSEL_IMAGES = [
+// WhatsApp Images from public folder
+const WHATSAPP_IMAGES = [
+  "/whatsapp-images/WhatsApp Image 2026-05-02 at 12.56.55 PM.jpeg",
+  "/whatsapp-images/WhatsApp Image 2026-05-02 at 12.56.55 PM (1).jpeg",
+  "/whatsapp-images/WhatsApp Image 2026-05-02 at 12.56.56 PM.jpeg",
+  "/whatsapp-images/WhatsApp Image 2026-05-02 at 12.56.56 PM (1).jpeg",
+  "/whatsapp-images/WhatsApp Image 2026-05-02 at 12.56.56 PM (2).jpeg",
+  "/whatsapp-images/WhatsApp Image 2026-05-02 at 12.56.57 PM.jpeg"
+];
+
+const CAROUSEL_IMAGES = [
   {
     title: "Professional Invoicing",
     description: "Create and manage professional GST invoices",
@@ -45,6 +55,7 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentWhatsAppSlide, setCurrentWhatsAppSlide] = useState(0);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -83,12 +94,28 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-rotate WhatsApp images carousel every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentWhatsAppSlide((prev) => (prev + 1) % WHATSAPP_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
   };
 
   const prevSlide = () => {
     setCurrentSlide((prev) => (prev - 1 + CAROUSEL_IMAGES.length) % CAROUSEL_IMAGES.length);
+  };
+
+  const nextWhatsAppSlide = () => {
+    setCurrentWhatsAppSlide((prev) => (prev + 1) % WHATSAPP_IMAGES.length);
+  };
+
+  const prevWhatsAppSlide = () => {
+    setCurrentWhatsAppSlide((prev) => (prev - 1 + WHATSAPP_IMAGES.length) % WHATSAPP_IMAGES.length);
   };
 
   if (loading) return <div className="text-center p-12">Loading...</div>;
@@ -150,6 +177,49 @@ export default function Dashboard() {
                   : 'bg-white/40 w-2 hover:bg-white/60'
               }`}
               aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* WhatsApp Images Carousel */}
+      <div className="relative overflow-hidden rounded-xl shadow-lg">
+        <div className="relative bg-slate-800 p-6 aspect-video flex items-center justify-center">
+          <img 
+            src={WHATSAPP_IMAGES[currentWhatsAppSlide]}
+            alt={`WhatsApp Image ${currentWhatsAppSlide + 1}`}
+            className="max-h-full max-w-full object-contain"
+          />
+        </div>
+
+        {/* Carousel Controls */}
+        <button 
+          onClick={prevWhatsAppSlide}
+          className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors z-10"
+          aria-label="Previous image"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <button 
+          onClick={nextWhatsAppSlide}
+          className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors z-10"
+          aria-label="Next image"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+
+        {/* Slide Indicators */}
+        <div className="flex justify-center gap-2 p-4 bg-slate-900/50">
+          {WHATSAPP_IMAGES.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentWhatsAppSlide(index)}
+              className={`h-2 rounded-full transition-all ${
+                index === currentWhatsAppSlide 
+                  ? 'bg-white w-8' 
+                  : 'bg-white/40 w-2 hover:bg-white/60'
+              }`}
+              aria-label={`Go to image ${index + 1}`}
             />
           ))}
         </div>

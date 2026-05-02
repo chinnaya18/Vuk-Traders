@@ -79,6 +79,7 @@ class InvoiceResponse(BaseModel):
     subtotal: Decimal
     total_cgst: Decimal
     total_sgst: Decimal
+    round_off: Decimal = Decimal("0")
     grand_total: Decimal
     amount_in_words: str
     declaration: str

@@ -18,7 +18,7 @@ export default function Navbar() {
           <div className="flex items-center flex-shrink-0">
             <Link to="/" className="flex items-center gap-2">
               <img src="/icon.png" alt="Vuk Traders" className="h-10 w-10 rounded" />
-              <span className="font-bold text-xl tracking-tight text-amber-300">Vuk Traders</span>
+              <span className="font-bold text-xl tracking-tight text-amber-300">VUK TRADERS</span>
             </Link>
           </div>
 

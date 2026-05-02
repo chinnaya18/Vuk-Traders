@@ -1,4 +1,5 @@
 import io
+import os
 import base64
 from decimal import Decimal
 from reportlab.lib import colors
@@ -22,6 +23,22 @@ def _build_qr_image(qr_base64: str, width=30*mm, height=30*mm):
     img_buffer = io.BytesIO(img_data)
     img = Image(img_buffer, width=width, height=height)
     return img
+
+
+def _get_logo_image(width=18*mm, height=18*mm):
+    """Load the company logo from the project root."""
+    # Try multiple possible locations
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "icon.png"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "icon.png"),
+        os.path.join(os.getcwd(), "icon.png"),
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            return Image(path, width=width, height=height)
+    
+    return None
 
 
 def generate_invoice_pdf(invoice, owner, bank_details) -> bytes:
@@ -51,45 +68,49 @@ def generate_invoice_pdf(invoice, owner, bank_details) -> bytes:
     # Custom styles
     style_title = ParagraphStyle(
         "InvoiceTitle", parent=styles["Heading1"],
-        fontSize=14, alignment=TA_CENTER, spaceAfter=2,
+        fontSize=16, alignment=TA_CENTER, spaceAfter=4,
         fontName="Helvetica-Bold", textColor=colors.HexColor("#1a1a2e")
     )
     style_subtitle = ParagraphStyle(
         "Subtitle", parent=styles["Normal"],
-        fontSize=8, alignment=TA_CENTER, spaceAfter=1,
+        fontSize=9, alignment=TA_CENTER, spaceAfter=2,
         textColor=colors.HexColor("#444444")
     )
     style_normal = ParagraphStyle(
         "NormalSmall", parent=styles["Normal"],
-        fontSize=8, leading=10
+        fontSize=9, leading=13
     )
     style_bold = ParagraphStyle(
         "BoldSmall", parent=styles["Normal"],
-        fontSize=8, leading=10, fontName="Helvetica-Bold"
+        fontSize=9, leading=13, fontName="Helvetica-Bold"
     )
     style_right = ParagraphStyle(
         "RightSmall", parent=styles["Normal"],
-        fontSize=8, leading=10, alignment=TA_RIGHT
+        fontSize=9, leading=13, alignment=TA_RIGHT
     )
     style_center = ParagraphStyle(
         "CenterSmall", parent=styles["Normal"],
-        fontSize=8, leading=10, alignment=TA_CENTER
+        fontSize=9, leading=13, alignment=TA_CENTER
     )
     style_heading = ParagraphStyle(
         "TableHeading", parent=styles["Normal"],
-        fontSize=7, fontName="Helvetica-Bold", alignment=TA_CENTER, leading=9
+        fontSize=8, fontName="Helvetica-Bold", alignment=TA_CENTER, leading=11
     )
     style_cell = ParagraphStyle(
         "TableCell", parent=styles["Normal"],
-        fontSize=7, leading=9
+        fontSize=8, leading=11
     )
     style_cell_right = ParagraphStyle(
         "TableCellRight", parent=styles["Normal"],
-        fontSize=7, leading=9, alignment=TA_RIGHT
+        fontSize=8, leading=11, alignment=TA_RIGHT
     )
     style_cell_center = ParagraphStyle(
         "TableCellCenter", parent=styles["Normal"],
-        fontSize=7, leading=9, alignment=TA_CENTER
+        fontSize=8, leading=11, alignment=TA_CENTER
+    )
+    style_company_name = ParagraphStyle(
+        "CompanyName", parent=styles["Normal"],
+        fontSize=12, fontName="Helvetica-Bold", leading=16
     )
 
     elements = []
@@ -127,64 +148,76 @@ def generate_invoice_pdf(invoice, owner, bank_details) -> bytes:
     elements.append(Paragraph("Tax Invoice", style_title))
 
     # =========================================================================
-    # OWNER / SELLER DETAILS + INVOICE DETAILS
+    # OWNER / SELLER DETAILS with LOGO + INVOICE DETAILS (two-column bordered)
     # =========================================================================
-    owner_addr = f"{owner.company_name}"
+    # Build seller info with logo on the left
+    company_name_upper = owner.company_name.upper()
+    
+    owner_addr_lines = f"<b>{company_name_upper}</b>"
     if owner.address_line1:
-        owner_addr += f"<br/>{owner.address_line1}"
+        owner_addr_lines += f"<br/>{owner.address_line1}"
     if owner.address_line2:
-        owner_addr += f", {owner.address_line2}"
+        owner_addr_lines += f", {owner.address_line2}"
     if owner.address_line3:
-        owner_addr += f", {owner.address_line3}"
+        owner_addr_lines += f", {owner.address_line3}"
     if owner.city:
-        owner_addr += f"<br/>{owner.city}"
+        owner_addr_lines += f"<br/>{owner.city}"
     if owner.pincode:
-        owner_addr += f" - {owner.pincode}"
+        owner_addr_lines += f" - {owner.pincode}"
     if owner.state:
-        owner_addr += f"<br/>{owner.state}"
+        owner_addr_lines += f"<br/>{owner.state}"
     if owner.state_code:
-        owner_addr += f" (Code: {owner.state_code})"
+        owner_addr_lines += f" (Code: {owner.state_code})"
     if owner.gstin:
-        owner_addr += f"<br/><b>GSTIN/UIN:</b> {owner.gstin}"
+        owner_addr_lines += f"<br/><b>GSTIN/UIN:</b> {owner.gstin}"
     if owner.email:
-        owner_addr += f"<br/><b>Email:</b> {owner.email}"
+        owner_addr_lines += f"<br/><b>Email:</b> {owner.email}"
 
-    inv_details = f"""
-    <b>Invoice No:</b> {invoice.invoice_no}<br/>
-    <b>Invoice Date:</b> {invoice.invoice_date}<br/>
-    <b>Delivery Note:</b> {invoice.delivery_note or '-'}<br/>
-    <b>Mode/Terms:</b> {invoice.mode_terms_payment or '-'}<br/>
-    """
-    inv_details_2 = f"""
-    <b>Buyer Order No:</b> {invoice.buyer_order_no or '-'}<br/>
-    <b>Dispatch Doc No:</b> {invoice.dispatch_doc_no or '-'}<br/>
-    <b>Dispatched Through:</b> {invoice.dispatched_through or '-'}<br/>
-    <b>Destination:</b> {invoice.destination or '-'}<br/>
-    """
+    # Build logo + seller name cell
+    logo_img = _get_logo_image()
+    if logo_img:
+        # Create a sub-table with logo on left and company details on right
+        seller_inner_data = [[logo_img, Paragraph(owner_addr_lines, style_normal)]]
+        seller_inner_table = Table(seller_inner_data, colWidths=[22*mm, page_width * 0.5 - 28*mm])
+        seller_inner_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        seller_content = seller_inner_table
+    else:
+        seller_content = Paragraph(f"<b>Seller:</b><br/>{owner_addr_lines}", style_normal)
+
+    # Build invoice details
+    inv_left = f"""<b>Invoice No:</b> {invoice.invoice_no}<br/>
+<b>Invoice Date:</b> {invoice.invoice_date}<br/>
+<b>Delivery Note:</b> {invoice.delivery_note or '-'}<br/>
+<b>Mode/Terms:</b> {invoice.mode_terms_payment or '-'}"""
+
+    inv_right = f"""<b>Buyer Order No:</b> {invoice.buyer_order_no or '-'}<br/>
+<b>Dispatch Doc No:</b> {invoice.dispatch_doc_no or '-'}<br/>
+<b>Dispatched Through:</b> {invoice.dispatched_through or '-'}<br/>
+<b>Destination:</b> {invoice.destination or '-'}"""
+
     if invoice.delivery_note_date:
-        inv_details_2 += f"<b>Del. Note Date:</b> {invoice.delivery_note_date}<br/>"
+        inv_right += f"<br/><b>Del. Note Date:</b> {invoice.delivery_note_date}"
 
+    # Main seller + invoice details table (3 columns to achieve perfect full height borders for all sections)
     seller_inv_data = [
-        [
-            Paragraph(f"<b>Seller:</b><br/>{owner_addr}", style_normal),
-            Paragraph(inv_details, style_normal),
-        ],
-        [
-            "",
-            Paragraph(inv_details_2, style_normal),
-        ]
+        [seller_content, Paragraph(inv_left, style_normal), Paragraph(inv_right, style_normal)],
     ]
 
-    seller_inv_table = Table(seller_inv_data, colWidths=[page_width * 0.5, page_width * 0.5])
+    seller_inv_table = Table(seller_inv_data, colWidths=[page_width * 0.5, page_width * 0.25, page_width * 0.25])
     seller_inv_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.5, colors.black),
         ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("SPAN", (0, 0), (0, 1)),
     ]))
     elements.append(seller_inv_table)
 
@@ -304,8 +337,11 @@ def generate_invoice_pdf(invoice, owner, bank_details) -> bytes:
     elements.append(items_table)
 
     # =========================================================================
-    # GRAND TOTAL SUMMARY
+    # GRAND TOTAL SUMMARY (with Round Off row)
     # =========================================================================
+    round_off_val = float(invoice.round_off) if invoice.round_off else 0.0
+    round_off_display = f"₹{round_off_val:+,.2f}" if round_off_val != 0 else "₹0.00"
+
     summary_data = [
         [Paragraph("<b>Subtotal (before tax):</b>", style_normal),
          Paragraph(f"<b>₹{invoice.subtotal:,.2f}</b>", style_right)],
@@ -313,6 +349,8 @@ def generate_invoice_pdf(invoice, owner, bank_details) -> bytes:
          Paragraph(f"₹{invoice.total_cgst:,.2f}", style_right)],
         [Paragraph(f"<b>SGST Total:</b>", style_normal),
          Paragraph(f"₹{invoice.total_sgst:,.2f}", style_right)],
+        [Paragraph(f"<b>Round Off:</b>", style_normal),
+         Paragraph(f"{round_off_display}", style_right)],
         [Paragraph(f"<b>Grand Total:</b>", style_normal),
          Paragraph(f"<b>₹{invoice.grand_total:,.2f}</b>", style_right)],
     ]
@@ -400,7 +438,7 @@ def generate_invoice_pdf(invoice, owner, bank_details) -> bytes:
 
     company_sig = f"""
     <br/><br/><br/>
-    <b>for {owner.company_name}</b><br/><br/>
+    <b>for {company_name_upper}</b><br/><br/>
     Authorised Signatory
     """
 

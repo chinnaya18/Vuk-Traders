@@ -1,0 +1,62 @@
+{
+  "name": "vuk-traders",
+  "version": "1.0.0",
+  "description": "Vuk Traders GST Invoice System - Local Desktop App",
+  "author": "Vuk Traders",
+  "main": "electron-main.js",
+  "type": "commonjs",
+  "homepage": "./",
+  "scripts": {
+    "dev": "cross-env DEBUG_PROD=false concurrently \"npm run backend-dev\" \"npm run frontend-dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "frontend-dev": "cd frontend && npm run dev",
+    "backend-dev": "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "build": "npm run build-frontend && npm run build-app",
+    "build-frontend": "cd frontend && npm run build",
+    "build-app": "npm run build-frontend && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.vuktradersgsystem.app",
+    "productName": "Vuk Traders GST Invoice System",
+    "asar": false,
+    "forceCodeSigning": false,
+    "files": [
+      "electron-main.js",
+      "electron-preload.js",
+      "frontend/dist/**/*",
+      "backend/**/*",
+      "icon.png",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": ".",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}.exe"
+    }
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0",
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "axios": "^1.15.2",
+    "electron-is-dev": "^2.0.0"
+  }
+}
